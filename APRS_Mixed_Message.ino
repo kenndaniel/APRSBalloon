@@ -17,6 +17,29 @@
 #include <math.h>
 #include <stdio.h>
 
+
+#ifdef DEBUG
+#define POUTPUT(x) Serial.print x
+#else
+#define POUTPUT(x)
+#endif
+
+#ifdef DEBUG
+#define POUTPUTLN(x) Serial.println x
+#else
+#define POUTPUTLN(x)
+#endif
+
+#include "config.h"
+#include <si5351.h>
+#include <JTEncode.h>
+#include "geofence.h"
+Si5351 si5351;
+unsigned long XtalFreq = 25003141;
+volatile float correction = 25000000./(float)XtalFreq;
+unsigned long freq = (unsigned long) (WSPR_FREQ1);
+#include "SI5351Interface.h"
+
 // Defines the Square Wave Output Pin
 #define OUT_PIN 2
 
@@ -77,7 +100,7 @@ unsigned int tc2400 = (unsigned int)(0.5 * adj_2400 * 1000000.0 / 2400.0);
 /*
  * This strings will be used to generate AFSK signals, over and over again.
  */
-const char *mycall = "MYCALL";
+const char *mycall = call;
 char myssid = 1;
 
 const char *dest = "APRS";
@@ -93,7 +116,7 @@ const char *lon = "10649.62E";
 const char sym_ovl = 'H';
 const char sym_tab = 'a';
 
-unsigned int tx_delay = 5000;
+unsigned int tx_delay = 15000;
 unsigned int str_len = 400;
 
 char bit_stuff = 0;
@@ -127,21 +150,27 @@ void print_debug(char type, char dest_type);
 void set_nada_1200(void)
 {
   digitalWrite(OUT_PIN, HIGH);
+  transmitAPRS(HIGH);
   delayMicroseconds(tc1200);
   digitalWrite(OUT_PIN, LOW);
+  transmitAPRS(LOW);
   delayMicroseconds(tc1200);
 }
 
 void set_nada_2400(void)
 {
   digitalWrite(OUT_PIN, HIGH);
+    transmitAPRS(HIGH);
   delayMicroseconds(tc2400);
   digitalWrite(OUT_PIN, LOW);
+    transmitAPRS(LOW);
   delayMicroseconds(tc2400);
   
   digitalWrite(OUT_PIN, HIGH);
+    transmitAPRS(HIGH);
   delayMicroseconds(tc2400);
   digitalWrite(OUT_PIN, LOW);
+    transmitAPRS(LOW);
   delayMicroseconds(tc2400);
 }
 
@@ -404,14 +433,14 @@ void send_packet(char packet_type, char dest_type)
    * PAYLOAD  : 1 byte data type + N byte info
    * FCS      : 2 bytes calculated from HEADER + PAYLOAD
    */
-  
+  APRSon();
   send_flag(100);
   crc = 0xffff;
   send_header(dest_type);
   send_payload(packet_type);
   send_crc();
   send_flag(3);
-
+  APRSoff();
   digitalWrite(LED_BUILTIN, 0);
 }
 
@@ -515,6 +544,9 @@ void setup()
 {
   set_io();
   print_code_version();
+  //GEOFENCE_position(42.283375, -87.963936);
+  //if(GEOFENCE_no_tx == APRS_Not_Ok)  return;  // 
+  setFrequencyAPRS();
 }
 
 void loop()
